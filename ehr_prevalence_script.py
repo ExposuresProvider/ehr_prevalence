@@ -5,9 +5,9 @@ import gc
 
 # Settings
 # Directory where data are stored
-data_dir = r'/home/user_xxxx/cohd/data'
+data_dir = 'synthetic_example_files'
 # Directory where results will be stored
-results_dir = r'/home/user_xxxx/cohd/results'
+results_dir = 'results'
 # File names of database dump files
 file_person = 'person.txt'
 file_concept_patient = 'unique_patient_concept_pairs_date.txt'

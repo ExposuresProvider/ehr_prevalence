@@ -68,14 +68,7 @@ def _unicode_csv_reader(unicode_csv_data, dialect=csv.excel, **kwargs):
     The native csv.reader does not read Unicode. Encode the data source
     as UTF-8
     """
-    return csv.reader(_utf_8_encoder(unicode_csv_data),
-                            dialect=dialect, **kwargs)
-                            
-        
-def _utf_8_encoder(unicode_csv_data):
-    """Encodes Unicode source as UTF-8"""
-    for line in unicode_csv_data:
-        yield line.encode('utf-8')
+    return csv.reader(unicode_csv_data, dialect=dialect, **kwargs)
 
 
 def _open_csv_reader(file, database):
@@ -94,7 +87,7 @@ def _open_csv_reader(file, database):
     """
     if database == 'ssms':
         # Microsoft SQL Server Management Studio output
-        fh = codecs.open(file, 'r', encoding='utf-8-sig')  
+        fh = open(file, 'r', encoding='utf-8-sig')
         reader = _unicode_csv_reader(fh, delimiter='\t')
     elif database == 'mysql':
         # MySQL output
@@ -184,13 +177,13 @@ def load_patient_data(file, database, extra_header_lines_skip=0):
     fh, reader = _open_csv_reader(file, database)
  
     # Read header line to get column names
-    header = reader.next()
+    header = next(reader)
     columns = _find_columns(header, ['person_id', 'ethnicity_concept_id', 'race_concept_id', 'gender_concept_id'])
     table_width = len(header)
 
     # Skip extra formatting lines after header
     for i in range(extra_header_lines_skip):
-        reader.next()
+        next(reader)
 
     # Read in each row
     patient_info = defaultdict(list)
@@ -230,13 +223,13 @@ def load_concept_patient_data(file, database, patient_info, extra_header_lines_s
     fh, reader = _open_csv_reader(file, database)
 
     # Read header
-    header = reader.next()
+    header = next(reader)
     columns = _find_columns(header, ['person_id', 'date', 'concept_id'])
     table_width = len(header)
 
     # Skip extra formatting lines after header
     for i in range(extra_header_lines_skip):
-        reader.next()
+        next(reader.next)
 
     # Read in each row of the file
     concept_year_patient = defaultdict(lambda: defaultdict(set))
@@ -302,9 +295,8 @@ def load_concepts(file, database, extra_header_lines_skip=0):
     
     # Open csv reader
     fh, reader = _open_csv_reader(file, database)
-
     # Read header
-    header = reader.next()
+    header = next(reader)
     table_width = len(header)
     if table_width == 4:
         columns = _find_columns(header, ['concept_id', 'concept_name', 'domain_id', 'concept_class_id'])
@@ -315,7 +307,7 @@ def load_concepts(file, database, extra_header_lines_skip=0):
 
     # Skip extra formatting lines after header
     for i in range(extra_header_lines_skip):
-        reader.next()
+        next(reader)
 
     # Read in each row of the file
     concepts = dict()
@@ -362,13 +354,13 @@ def load_descendants(file, database, extra_header_lines_skip=0):
     fh, reader = _open_csv_reader(file, database)
 
     # Read header
-    header = reader.next()
+    header = next(reader)
     columns = _find_columns(header, ['concept_id', 'descendant_concept_id'])
     table_width = len(header)
 
     # Skip extra formatting lines after header
     for i in range(extra_header_lines_skip):
-        reader.next()
+        next(reader.next)
 
     # Read in each row of the file and add the descendants to the dictionary
     concept_descendants = defaultdict(set)
