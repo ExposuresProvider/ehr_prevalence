@@ -815,7 +815,7 @@ def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
     
     # How often to display progress message
     n_concepts = len(concept_ids)
-    n_concept_pairs = numpy.sum(numpy.array(range(n_concepts - 1), dtype=numpy.float))
+    n_concept_pairs = numpy.sum(numpy.array(range(n_concepts - 1), dtype=float))
     progress_interval = 100
     logging.info('%d concepts meeting min_count, %d possible pairs of concepts' % (len(concept_ids), n_concept_pairs))
 
@@ -896,7 +896,7 @@ def single_concept_yearly_deviation(output_dir, cp_data, concepts, year_range, r
 
     # How often to display progress message
     n_concepts = len(concept_year_patient)
-    progress_interval = numpy.Inf  # Inf --> no progress messages
+    progress_interval = numpy.inf  # Inf --> no progress messages
 
     # Iterate over all concept IDs in concepts
     for counter, concept_id in enumerate(concepts):
@@ -913,7 +913,7 @@ def single_concept_yearly_deviation(output_dir, cp_data, concepts, year_range, r
 
         # Randomize each annual count
         if randomize:
-            counts = randomize_count(counts)
+            counts = numpy.array([randomize_count(counts[c]) for c in range(len(counts))], dtype=float)
 
         # Calculate the mean of the (maybe randomized) prevalence rates
         m = numpy.mean(counts / ppy)
@@ -978,7 +978,7 @@ def paired_concept_yearly_deviation(output_dir, cp_data, concept_pairs, year_ran
 
         # Randomize each annual count
         if randomize:
-            counts = randomize_count(counts)
+            counts = numpy.array([randomize_count(counts[c]) for c in range(len(counts))], dtype=float)
 
         # Calculate the mean of the (maybe randomized) prevalence rates
         m = numpy.mean(counts / ppy)
