@@ -568,9 +568,7 @@ def merge_ranged_concept_descendants(cp_ranged, concepts, descendants):
 
 def single_concept_yearly_counts(output_dir, cp_data, randomize=True, min_count=11):
     """Writes concept counts and frequencies on an annual basis
-    
-    Writes results to file <output_dir>\concept_counts_yearly_<settings>.txt
-    
+
     Parameters
     ----------
     output_dir: string - Path to folder where the results should be written
@@ -863,8 +861,6 @@ def paired_concept_ranged_counts(output_dir, cp_ranged, randomize=True, min_coun
 def single_concept_yearly_deviation(output_dir, cp_data, concepts, year_range, randomize=True, file_label=None):
     """Writes mean and standard deviation of concept prevalences per year over the specified year range
 
-    Writes results to file <output_dir>\concept_counts_yearly_<settings>.txt
-
     Parameters
     ----------
     output_dir: string - Path to folder where the results should be written
@@ -926,8 +922,6 @@ def single_concept_yearly_deviation(output_dir, cp_data, concepts, year_range, r
 
 def paired_concept_yearly_deviation(output_dir, cp_data, concept_pairs, year_range, randomize=True, file_label=None):
     """Writes mean and standard deviation of concept pair co-occurrences per year over the specified year range
-
-    Writes results to file <output_dir>\concept_counts_yearly_<settings>.txt
 
     Parameters
     ----------

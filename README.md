@@ -70,7 +70,8 @@ Exporting from the OMOP database produces files containing PII (```person.txt```
 
 Running ```ehr_prevalence_script.py``` with default settings will produce the following files.
 
-Data quality files: these files contain annual counts of patients, concepts, and prevalence counts for basic consistency checks.
+Data quality files (optional - only generated when quality_analysis() function is called): these files contain 
+annual counts of patients, concepts, and prevalence counts for basic consistency checks.
 1.  ```dq_patients_year.txt```  
 The number of patients per year
 2.  ```dq_domain_year_total_count.txt```  
@@ -83,7 +84,9 @@ Concept counts files: these files contain the prevalence data of each concept or
 Single concept counts and frequencies (1 file for the 5-year dataset and 1 file for the lifetime dataset)
 2. ```concept_pair_counts_<settings>.txt```  
 Paired concept counts and frequencies (1 file for the 5-year dataset and 1 file for the lifetime dataset)
-3. ```concept_counts_yearly_<settings>.txt```  
-Counts and frequencies of each single concept per year (default settings do not generate this analysis)
+3. ```concept_yearly_deviation_{settings}.txt```
+mean and standard deviation of concept prevalences per year over the specified year range
+4. ```concept_pair_yearly_deviation_{settings}.txt```
+mean and standard deviation of concept pair co-occurrences per year over the specified year range
 
 Synthetic example files can be found in the ```synthetic_example_files``` folder. 
