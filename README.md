@@ -10,7 +10,7 @@ This is the analysis performed to generate the [Columbia Open Health Data (COHD)
 
 ## Pre-requisites
 
-* Python 2
+* Python 3
 * Numpy: ```pip install numpy```
 
 
