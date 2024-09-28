@@ -44,16 +44,20 @@ def compute_stats(c1, c2, cp, n):
     b = c1 - cp
     c = c2 - cp
     d = n - c1 - c2 + cp
-    contingency_table = np.array([[a, b], [c, d]])
-    _, p_value, _, _ = chi2_contingency(contingency_table, correction=False)
 
     # Check b/c <= 0 since Poisson perturbation can cause b or c to be negative
     if b <= 0 or c <= 0:
         if a == 0:
-            return p_value, 0, [0, 0]
+            return 0, 0, [0, 0]
         else:
-            return p_value, np.inf, [np.inf, np.inf]
+            return np.inf, np.inf, [np.inf, np.inf]
     else:
+        try:
+            contingency_table = np.array([[a, b], [c, d]])
+            _, p_value, _, _ = chi2_contingency(contingency_table, correction=False)
+        except ValueError as ex:
+            print(f'a: {a}, b: {b}, c: {c}, d: {d}, exception: {ex}')
+            p_value = np.inf
         log_odds_val = np.log((a*d)/(b*c))
         ci = 1.96 * np.sqrt(1/a + 1/b + 1/c + 1/d)
         ci = [log_odds_val - ci, log_odds_val + ci]
