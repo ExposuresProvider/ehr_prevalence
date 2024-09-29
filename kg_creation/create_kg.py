@@ -1,4 +1,5 @@
 import os
+import gc
 import argparse
 import numpy as np
 from scipy.stats import chi2_contingency
@@ -115,8 +116,8 @@ if __name__ == '__main__':
                         default='/projects/datatrans/CarolinaOpenHealthData/mapping/mappings.csv',
                         help='input csv that includes mappings from OMOP concept id to biolink id')
     parser.add_argument('--patient_num', type=int, default=2344578, help='number of total patients in the data')
-    parser.add_argument('--output_kg_file', type=str,
-                        default='/projects/datatrans/CarolinaOpenHealthData/full_set_results/output/unc_omop_2018_2022_kg.csv',
+    parser.add_argument('--output_kg_chunk_base', type=str,
+                        default='/projects/datatrans/CarolinaOpenHealthData/full_set_results/output/chunks/unc_omop_2018_2022_kg',
                         help='output csv that includes knowledge graph csv created from concept count and concept pair counts')
 
     args = parser.parse_args()
@@ -124,7 +125,7 @@ if __name__ == '__main__':
     input_concept_pair_count_file = args.input_concept_pair_count_file
     patient_num = args.patient_num
     input_mapping_file = args.input_mapping_file
-    output_kg_file = args.output_kg_file
+    output_kg_chunk_base = args.output_kg_chunk_base
 
     t1 = datetime.now()
     mapping_df = pd.read_csv(input_mapping_file, dtype=str)
@@ -163,18 +164,30 @@ if __name__ == '__main__':
     joined_df.rename(columns={'count': 'count_concept_id2'}, inplace=True)
     # Drop the unnecessary 'concept_id' column from the right_df
     joined_df.drop(columns=['concept_id'], inplace=True)
+    print(f'joined_df shape: {joined_df.shape}', flush=True)
+    del input_concept_count_df
+    del input_concept_pair_count_df
+    gc.collect()
 
+    chunk_size = 1000000
+    num_chunks = (len(joined_df) // chunk_size) + 1
     t1 = datetime.now()
-    joined_df[['subject', 'subject_name', 'object', 'object_name', 'predicate', 'chi_squared_p_value', 'log_odds_ratio',
-               'log_odds_ratio_95_confidence_interval']] \
-        = joined_df.apply(lambda row: compute_edge_info(row, mapping_df, patient_num), axis=1, result_type='expand')
-    joined_df.drop(columns=['concept_id1', 'concept_id2', 'count_pair', 'count_concept_id1', 'count_concept_id2'],
-                   inplace=True)
-    joined_df.to_csv(output_kg_file, index=False)
+    for chunk_idx in range(num_chunks):
+        output_file = f'{output_kg_chunk_base}_chunk_{chunk_idx}.csv'
+        start_idx = chunk_idx * chunk_size
+        end_idx = min(start_idx + chunk_size, len(joined_df))
+        chunk_df = joined_df.iloc[start_idx:end_idx]
+        print(f"Processing chunk {chunk_idx} ({start_idx} to {end_idx})...", flush=True)
+        chunk_df[['subject', 'subject_name', 'object', 'object_name', 'predicate', 'chi_squared_p_value', 'log_odds_ratio',
+                   'log_odds_ratio_95_confidence_interval']] \
+            = chunk_df.apply(lambda row: compute_edge_info(row, mapping_df, patient_num), axis=1, result_type='expand')
+        chunk_df.drop(columns=['concept_id1', 'concept_id2', 'count_pair', 'count_concept_id1', 'count_concept_id2'],
+                      inplace=True)
+        chunk_df.to_csv(output_file, index=False, float_format="%.3f")
 
     if omop_ids_not_mapped:
         omop_ids_not_mapped = list(set(omop_ids_not_mapped))
-        with open(f'{os.path.splitext(output_kg_file)[0]}_omop_ids_not_mapped.txt', 'w') as f:
+        with open(f'{os.path.splitext(input_mapping_file)[0]}_omop_ids_not_mapped.txt', 'w') as f:
             f.writelines([f'{line}\n' for line in omop_ids_not_mapped])
 
-    print(f'knowledge graph is created, time taken: {(datetime.now() - t1).seconds}')
+    print(f'knowledge graph chunks are created, time taken: {(datetime.now() - t1).seconds}')
