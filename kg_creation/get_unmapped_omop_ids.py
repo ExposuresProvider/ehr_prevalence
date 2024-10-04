@@ -24,5 +24,5 @@ if __name__ == '__main__':
     unique_concept_ids = pd.concat([data_df['concept_id1'], data_df['concept_id2']]).unique()
     omop_ids_set = set(mapping_df['omop_id'])
     unmapped_concept_ids = [concept_id for concept_id in unique_concept_ids if concept_id not in omop_ids_set]
-    unmapped_concept_df = pd.DataFrame(unmapped_concept_ids, columns=['filtered_concept_id'])
+    unmapped_concept_df = pd.DataFrame(unmapped_concept_ids, columns=['unmapped_concept_id'])
     unmapped_concept_df.to_csv(output_file, index=False)
