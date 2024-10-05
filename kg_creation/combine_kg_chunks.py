@@ -24,6 +24,8 @@ if __name__ == '__main__':
             print(f"Reading {chunk_path}...", flush=True)
             # Read the chunk and append it to the list
             chunk_df = pd.read_csv(chunk_path, dtype=str)
+            # filter out those rows with predicate column N/A
+            chunk_df = chunk_df[chunk_df['predicate'].notna()]
             all_chunks.append(chunk_df)
 
     combined_df = pd.concat(all_chunks, ignore_index=True)
