@@ -16,16 +16,20 @@ if __name__ == '__main__':
     input_dir = args.input_dir
     output_file = args.output_file
 
+    files = os.listdir(input_dir)
+    # sort files by the chunk number in increasing order
+    sorted_files = sorted(files, key=lambda x: int(x.split('_')[-1].split('.')[0]))
     all_chunks = []
-    for chunk_file in sorted(os.listdir(input_dir)):
+    for chunk_file in sorted_files:
         # Only consider CSV files (in case there are other files in the folder)
         if chunk_file.endswith(".csv"):
             chunk_path = os.path.join(input_dir, chunk_file)
-            print(f"Reading {chunk_path}...", flush=True)
             # Read the chunk and append it to the list
             chunk_df = pd.read_csv(chunk_path, dtype=str)
             # filter out those rows with predicate column N/A
+            print(f'before filtering na in {chunk_file}, shape: {chunk_df.shape}', flush=True)
             chunk_df = chunk_df[chunk_df['predicate'].notna()]
+            print(f'after filtering na in {chunk_file}, shape: {chunk_df.shape}', flush=True)
             all_chunks.append(chunk_df)
 
     combined_df = pd.concat(all_chunks, ignore_index=True)
