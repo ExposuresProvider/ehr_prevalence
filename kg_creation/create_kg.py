@@ -176,7 +176,7 @@ if __name__ == '__main__':
         output_file = f'{output_kg_chunk_base}_chunk_{chunk_idx}.csv'
         start_idx = chunk_idx * chunk_size
         end_idx = min(start_idx + chunk_size, len(joined_df))
-        chunk_df = joined_df.iloc[start_idx:end_idx]
+        chunk_df = joined_df.iloc[start_idx:end_idx].copy()
         print(f"Processing chunk {chunk_idx} ({start_idx} to {end_idx})...", flush=True)
         chunk_df[['subject', 'subject_name', 'object', 'object_name', 'predicate', 'chi_squared_p_value', 'log_odds_ratio',
                    'log_odds_ratio_95_confidence_interval']] \
