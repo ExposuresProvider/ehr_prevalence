@@ -35,3 +35,4 @@ if __name__ == '__main__':
     combined_df = pd.concat(all_chunks, ignore_index=True)
     combined_df.to_csv(output_file, index=False)
     print(f'combined knowledge graph file {output_file} is created')
+    exit(0)
