@@ -179,7 +179,7 @@ if __name__ == '__main__':
         chunk_df = joined_df.iloc[start_idx:end_idx].copy()
         print(f"Processing chunk {chunk_idx} ({start_idx} to {end_idx})...", flush=True)
         chunk_df[['subject', 'subject_name', 'object', 'object_name', 'predicate', 'chi_squared_p_value', 'log_odds_ratio',
-                   'log_odds_ratio_95_confidence_interval']] \
+                   'log_odds_ratio_95_ci']] \
             = chunk_df.apply(lambda row: compute_edge_info(row, mapping_df, patient_num), axis=1, result_type='expand')
         chunk_df.drop(columns=['concept_id1', 'concept_id2', 'count_pair', 'count_concept_id1', 'count_concept_id2'],
                       inplace=True)
