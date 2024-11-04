@@ -9,7 +9,9 @@ if __name__ == '__main__':
                         help='input csv file')
     parser.add_argument('--added_attrs',
                         default={
-                            'total_sample_size': 2344578
+                            'total_sample_size': 2344578,
+                            'primary_knowledge_source': 'infores:icees-kg',
+                            'aggregator_knowledge_source': 'infores:automat-openhealthdata-carolina'
                         },
                         help='static attributes that need to be added')
     parser.add_argument('--output_file', type=str,
