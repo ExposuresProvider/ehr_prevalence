@@ -99,3 +99,8 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+.idea/
+synthetic_example_files/concept_descendants_all_observed.txt
+synthetic_example_files/concept_descendants_direct.txt
+kg_creation/data/
