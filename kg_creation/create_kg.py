@@ -122,9 +122,9 @@ def compute_log_odds(c1, c2, cp, n):
     # Check b/c <= 0 since Poisson perturbation can cause b or c to be negative
     if b <= 0 or c <= 0:
         if a == 0:
-            return 0, 0, [0, 0]
+            return 0, [0, 0]
         else:
-            return np.inf, np.inf, [np.inf, np.inf]
+            return np.inf, [np.inf, np.inf]
     else:
         log_odds_val = np.log((a*d)/(b*c))
         ci = 1.96 * np.sqrt(1/a + 1/b + 1/c + 1/d)
