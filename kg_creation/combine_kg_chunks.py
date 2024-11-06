@@ -11,10 +11,17 @@ if __name__ == '__main__':
     parser.add_argument('--output_file', type=str,
                         default='/projects/datatrans/CarolinaOpenHealthData/full_set_results/output/unc_omop_2018_2022_kg.csv',
                         help='combined output csv file')
+    parser.add_argument('--added_attrs',
+                        default={
+                            'total_sample_size': 2344578,
+                            'primary_knowledge_source': 'infores:openhealthdata-carolina'
+                        },
+                        help='static attributes that need to be added')
 
     args = parser.parse_args()
     input_dir = args.input_dir
     output_file = args.output_file
+    added_attrs = args.added_attrs
 
     files = os.listdir(input_dir)
     # sort files by the chunk number in increasing order
@@ -26,13 +33,11 @@ if __name__ == '__main__':
             chunk_path = os.path.join(input_dir, chunk_file)
             # Read the chunk and append it to the list
             chunk_df = pd.read_csv(chunk_path, dtype=str)
-            # filter out those rows with predicate column N/A
-            print(f'before filtering na in {chunk_file}, shape: {chunk_df.shape}', flush=True)
-            chunk_df = chunk_df[chunk_df['predicate'].notna()]
-            print(f'after filtering na in {chunk_file}, shape: {chunk_df.shape}', flush=True)
             all_chunks.append(chunk_df)
 
     combined_df = pd.concat(all_chunks, ignore_index=True)
+    for k, v in added_attrs.items():
+        combined_df[k] = v
     combined_df.to_csv(output_file, index=False)
     print(f'combined knowledge graph file {output_file} is created')
     exit(0)
