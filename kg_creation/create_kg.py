@@ -1,13 +1,86 @@
+########################################################
+# This script is adapted from KGX COHD implementation
+# https://github.com/WengLab-InformaticsResearch/cohd_api/blob/master/kgx/kgx_cohd.py
+########################################################
 import os
 import gc
 import argparse
 import numpy as np
-from scipy.stats import chi2_contingency
+from scipy.stats import poisson, chisquare
 from datetime import datetime
 import pandas as pd
 from utils import normalize_nodes
 
+THRESHOLD_COUNT = 10
+LN_RATIO_THRESHOLD = 1.0
+MIN_P = 1e-12  # ARAX displays p-value of 0 as None. Replace with a minimum p-value
 omop_ids_not_mapped = []
+
+# Pre-cache values for poisson_ci. Confidence values of 0.99 and 0.999 are commonly used. Caching up to a freq of 10000
+# covers 99% of co-occurrence counts in COHD and takes up < 1MB RAM for both confidence levels.
+_poisson_ci_cache = {
+    0.99: dict(),
+    0.999: dict()
+}
+
+def poisson_ci(freq, confidence=0.99):
+    """ Assuming two Poisson processes (1 for the event rate and 1 for randomization), calculate the confidence interval
+    for the true rate
+
+    Parameters
+    ----------
+    freq: float - co-occurrence frequency
+    confidence: float - desired confidence. range: [0, 1]
+
+    Returns
+    -------
+    (lower bound, upper bound)
+    """
+    # # Adjust the interval for each individual poisson to achieve overall confidence interval
+    # return poisson.interval(confidence, freq)
+
+    # COHD defaults to confidence values of 0.99 and 0.999 (double poisson), so cache these values to save compute time
+    use_cache = (confidence == 0.99 or confidence == 0.999)
+    if use_cache:
+        cache = _poisson_ci_cache[confidence]
+        if freq in cache:
+            return cache[freq]
+
+    # Same result as using poisson.interval, but much faster calculation
+    alpha = 1 - confidence
+    ci = poisson.ppf([alpha / 2, 1 - alpha / 2], freq)
+    ci[0] = max(ci[0], 1)  # min possible count is 1
+    ci = tuple(ci)
+
+    if use_cache:
+        # Only cache results for 99% and 99.9% CI
+        _poisson_ci_cache[confidence][freq] = ci
+    return ci
+
+
+def double_poisson_ci(freq, confidence=0.99):
+    """ Assuming two Poisson processes (1 for the event rate and 1 for randomization), calculate the confidence interval
+    for the true rate
+
+    Parameters
+    ----------
+    freq: float - co-occurrence frequency
+    confidence: float - desired confidence. range: [0, 1]
+
+    Returns
+    -------
+    (lower bound, upper bound)
+    """
+    # # Adjust the interval for each individual poisson to achieve overall confidence interval
+    # confidence_adjusted = 1 - (1 - confidence) ** 0.5
+    # return (poisson.interval(confidence_adjusted, poisson.interval(confidence_adjusted, freq)[0])[0],
+    #         poisson.interval(confidence_adjusted, poisson.interval(confidence_adjusted, freq)[1])[1])
+
+    # More efficient calculation using a single call to poisson.interval with similar results as above
+    # Adjust the interval for each individual poisson to achieve overall confidence interval
+    confidence_adjusted = 1 - ((1 - confidence) ** 1.5)
+    return poisson_ci(freq, confidence_adjusted)
+
 
 def get_normalized_id_and_name(row_id, map_dict):
     mapped_data = map_dict.get(row_id, {})
@@ -27,8 +100,8 @@ def get_normalized_id_and_name(row_id, map_dict):
     return row_id, ''
 
 
-def compute_stats(c1, c2, cp, n):
-    """ Calculates the p-value, log-odds and 95% CI
+def compute_log_odds(c1, c2, cp, n):
+    """ Calculates log-odds and 95% CI
 
     Params
     ------
@@ -39,7 +112,7 @@ def compute_stats(c1, c2, cp, n):
 
     Returns
     -------
-    (p_value, log-odds, [95% CI lower bound, 95% CI upper bound])
+    (log-odds, [95% CI lower bound, 95% CI upper bound])
     """
     a = cp
     b = c1 - cp
@@ -49,25 +122,57 @@ def compute_stats(c1, c2, cp, n):
     # Check b/c <= 0 since Poisson perturbation can cause b or c to be negative
     if b <= 0 or c <= 0:
         if a == 0:
-            return 0, 0, [0, 0]
+            return 0, [0, 0]
         else:
-            return np.inf, np.inf, [np.inf, np.inf]
+            return np.inf, [np.inf, np.inf]
     else:
-        try:
-            contingency_table = np.array([[a, b], [c, d]])
-            _, p_value, _, _ = chi2_contingency(contingency_table, correction=False)
-        except ValueError as ex:
-            print(f'a: {a}, b: {b}, c: {c}, d: {d}, exception: {ex}')
-            p_value = np.inf
         log_odds_val = np.log((a*d)/(b*c))
         ci = 1.96 * np.sqrt(1/a + 1/b + 1/c + 1/d)
         ci = [log_odds_val - ci, log_odds_val + ci]
-        return p_value, log_odds_val, ci
+        return log_odds_val, ci
+
+
+def chi_square(cpc, c1, c2, pts, min_p=MIN_P):
+    """ Calculate p-value using Chi-square
+
+    Params
+    ------
+    cpc: concept-pair count
+    c1: count for concept 1
+    c2: count for concept 2
+    pts: total population size
+    min_p: minimum p-value to return
+    """
+    neg = pts - c1 - c2 + cpc
+    # Create the observed and expected RxC tables and perform chi-square
+    o = [neg, c1 - cpc, c2 - cpc, cpc]
+    e = [(pts - c1) * (pts - c2) / pts, c1 * (pts - c2) / pts, c2 * (pts - c1) / pts, c1 * c2 / pts]
+    cs = chisquare(o, e, 2)
+    p = max(cs.pvalue, min_p)
+    return p
+
+
+def ln_ratio_ci(freq, ln_ratio, confidence=0.99):
+    """ Estimates the confidence interval of the log ratio using the double poisson method
+
+    Parameters
+    ----------
+    freq: float - co-occurrence count
+    ln_ratio: float - log ratio
+    confidence: float - desired confidence. range: [0, 1]
+
+    Returns
+    -------
+    (lower bound, upper bound)
+    """
+    # Convert ln_ratio back to ratio and calculate confidence intervals for the ratios
+    ci = tuple(np.log(np.array(double_poisson_ci(freq, confidence)) * np.exp(ln_ratio) / freq))
+    return ci
 
 
 def compute_edge_info(row, map_df, total_pats):
     # return subject, subject_name, object, object_name, predicate, chi_squared_p_value,
-    # log_odds_ratio, log_odds_ratio_95_confidence_interval, count_pair
+    # log_odds_ratio, log_odds_ratio_95_ci, count_pair
     omop_id_1, omop_id_2, count_1, count_2, count_pair = (row['concept_id1'], row['concept_id2'],
                                                           row['count_concept_id1'], row['count_concept_id2'],
                                                           row['count_pair'])
@@ -88,18 +193,24 @@ def compute_edge_info(row, map_df, total_pats):
         biolink_id_2 = biolink_label_2 = ''
         omop_ids_not_mapped.append(omop_id_2)
 
-    if count_1 < 10 or count_2 < 10 or count_pair < 10:
-        # don't return edge info if counts are less than 10 to protect patient privacy
-        return biolink_id_1, biolink_label_1, biolink_id_2, biolink_label_2, None, None, None, None
+    if count_1 < THRESHOLD_COUNT or count_2 < THRESHOLD_COUNT or count_pair < THRESHOLD_COUNT:
+        # don't return edge info if counts are less than THRESHOLD_COUNT to protect patient privacy
+        return biolink_id_1, biolink_label_1, biolink_id_2, biolink_label_2, None, None, None, None, None
 
-    # calculate log-odds
-    p_val, lo, lo_ci = compute_stats(count_1, count_2, count_pair, total_pats)
-    if lo_ci[0] > 0.5 or lo_ci[1] < -0.5:
+    # calculate ln_ratio
+    lnr = np.log(count_pair * total_pats / (count_1 * count_2))
+    lnr_ci = ln_ratio_ci(count_pair, lnr)
+
+    if lnr_ci[0] > LN_RATIO_THRESHOLD or lnr_ci[1] < -LN_RATIO_THRESHOLD:
+        # calculate chi-square
+        p_val = chi_square(count_pair, count_1, count_2, total_pats)
+        # calculate log-odds
+        lo, lo_ci = compute_log_odds(count_1, count_2, count_pair, total_pats)
+        score = lnr_ci[0] if lnr > 0 else -lnr_ci[1]
         predicate = 'biolink:positively_correlated_with' if lo_ci[0] > 0 else 'biolink:negatively_correlated_with'
-        return biolink_id_1, biolink_label_1, biolink_id_2, biolink_label_2, predicate, p_val, lo, lo_ci
+        return biolink_id_1, biolink_label_1, biolink_id_2, biolink_label_2, predicate, p_val, lo, lo_ci, score
     else:
-        return biolink_id_1, biolink_label_1, biolink_id_2, biolink_label_2, None, None, None, None
-
+        return biolink_id_1, biolink_label_1, biolink_id_2, biolink_label_2, None, None, None, None, None
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process input arguments.')
@@ -179,10 +290,12 @@ if __name__ == '__main__':
         chunk_df = joined_df.iloc[start_idx:end_idx].copy()
         print(f"Processing chunk {chunk_idx} ({start_idx} to {end_idx})...", flush=True)
         chunk_df[['subject', 'subject_name', 'object', 'object_name', 'predicate', 'chi_squared_p_value', 'log_odds_ratio',
-                   'log_odds_ratio_95_ci']] \
+                   'log_odds_ratio_95_ci', 'score']] \
             = chunk_df.apply(lambda row: compute_edge_info(row, mapping_df, patient_num), axis=1, result_type='expand')
         chunk_df.drop(columns=['concept_id1', 'concept_id2', 'count_pair', 'count_concept_id1', 'count_concept_id2'],
                       inplace=True)
+        # filter out those rows with predicate column N/A
+        chunk_df = chunk_df[chunk_df['predicate'].notna()]
         chunk_df.to_csv(output_file, index=False, float_format="%.3f")
 
     if omop_ids_not_mapped:
